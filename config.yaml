@@ -1,0 +1,33 @@
+# Default configuration for algobot.
+# Every field can be overridden on the command line, e.g.
+#   python -m algobot backtest --symbol MSFT --fast 10 --slow 30
+
+data:
+  source: yahoo          # yahoo | csv | synthetic
+  symbol: SPY
+  start: "2015-01-01"
+  end: null              # null = today
+  interval: 1d           # 1d | 1h | 1wk (yahoo intervals)
+  path: null             # required when source = csv
+
+strategy:
+  name: ema_cross
+  params:
+    fast: 20
+    slow: 50
+    allow_short: false
+    trend_filter: 200    # 0 disables the long-term trend filter
+
+backtest:
+  initial_cash: 100000.0
+  commission_bps: 5.0    # 0.05% per trade, charged on notional
+  slippage_bps: 2.0      # 0.02% adverse fill vs. reference price
+  fill: next_open        # next_open (realistic) | close (mark-on-close)
+
+risk:
+  risk_per_trade: 0.01   # fraction of equity risked between entry and stop
+  max_position_pct: 1.0  # cap on notional exposure as a fraction of equity
+  stop_loss_atr: 2.0     # stop distance in ATR multiples (null disables)
+  take_profit_atr: null  # take-profit distance in ATR multiples (null disables)
+  atr_period: 14
+  max_drawdown_stop: 0.25  # liquidate and halt below this drawdown (null disables)
