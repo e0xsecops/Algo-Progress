@@ -22,6 +22,7 @@ from algobot.backtest import Backtester
 from algobot.config import apply_overrides, load_config
 from algobot.data import DataError, load
 from algobot.portfolio import load_many, run_portfolio
+from algobot.report import write_backtest_report, write_portfolio_report
 from algobot.risk import RiskManager
 from algobot.search import OBJECTIVES, grid_search, grid_size
 from algobot.strategies import FAMILIES, available, get_strategy
@@ -174,6 +175,10 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     if args.out:
         written = result.to_csv(args.out)
         print("\nWrote " + ", ".join(written.values()))
+
+    if args.report:
+        path = write_backtest_report(result, args.report)
+        print(f"Wrote report {path}")
 
     if args.json:
         payload = {
@@ -424,6 +429,10 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
         if not correlation.empty:
             correlation.to_csv(path / "correlation.csv")
         print(f"\nWrote {path}/portfolio_equity.csv, contributions.csv, trades.csv")
+
+    if args.report:
+        path = write_portfolio_report(result, args.report)
+        print(f"Wrote report {path}")
     return 0
 
 
@@ -459,6 +468,11 @@ def build_parser() -> argparse.ArgumentParser:
     bt = sub.add_parser("backtest", help="run a single backtest")
     _add_common(bt)
     bt.add_argument("--out", help="directory for equity_curve.csv, trades.csv, fills.csv")
+    bt.add_argument(
+        "--report",
+        metavar="FILE.html",
+        help="write a standalone HTML report with charts (no external assets)",
+    )
     bt.add_argument("--json", action="store_true", help="also print metrics as JSON")
     bt.add_argument(
         "--show-trades",
@@ -564,6 +578,11 @@ def build_parser() -> argparse.ArgumentParser:
         "values are normalised, so 2,1,1 means 50/25/25",
     )
     pf.add_argument("--out", help="directory for portfolio_equity.csv and friends")
+    pf.add_argument(
+        "--report",
+        metavar="FILE.html",
+        help="write a standalone HTML report with charts (no external assets)",
+    )
     pf.set_defaults(func=cmd_portfolio)
 
     ls = sub.add_parser("strategies", help="list registered strategies and parameters")
