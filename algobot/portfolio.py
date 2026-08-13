@@ -106,18 +106,14 @@ class PortfolioResult:
         # that return. A share-of-net-profit column would explode whenever the
         # winners and losers nearly cancel.
         allocated = frame["allocated"].sum()
-        frame["contribution_pct"] = (
-            (frame["pnl"] / allocated * 100).round(2) if allocated else 0.0
-        )
+        frame["contribution_pct"] = (frame["pnl"] / allocated * 100).round(2) if allocated else 0.0
         return frame.reset_index(drop=True)
 
     def summary(self) -> str:
         title = f"Portfolio: {self.strategy} across {len(self.sleeves)} symbol(s)"
         out = format_metrics(self.metrics, title)
 
-        worst = min(
-            (r.metrics.max_drawdown for r in self.sleeves.values()), default=0.0
-        )
+        worst = min((r.metrics.max_drawdown for r in self.sleeves.values()), default=0.0)
         out += (
             f"\nDiversification ratio: {self.diversification_ratio():.2f} "
             "(>1 means the sleeves offset each other)"

@@ -59,7 +59,7 @@ def test_missing_or_degenerate_weights_are_rejected(market):
     with pytest.raises(ValueError, match="no weight given"):
         run_portfolio(market, "macd", weights={"ALFA": 1.0})
     with pytest.raises(ValueError, match="positive"):
-        run_portfolio(market, "macd", weights={s: 0.0 for s in SYMBOLS})
+        run_portfolio(market, "macd", weights=dict.fromkeys(SYMBOLS, 0.0))
 
 
 def test_empty_input_is_rejected():
@@ -91,9 +91,7 @@ def test_sleeves_with_different_histories_still_start_fully_funded():
 def test_trades_are_tagged_with_their_symbol(portfolio):
     assert "symbol" in portfolio.trades.columns
     assert set(portfolio.trades["symbol"]) <= set(SYMBOLS)
-    assert len(portfolio.trades) == sum(
-        len(run.trades) for run in portfolio.sleeves.values()
-    )
+    assert len(portfolio.trades) == sum(len(run.trades) for run in portfolio.sleeves.values())
 
 
 def test_costs_are_summed_across_sleeves(portfolio):
@@ -180,9 +178,7 @@ def test_load_many_reads_a_directory_of_csvs():
 
 
 def test_load_many_reports_missing_symbols_without_failing():
-    data, failures = load_many(
-        ["ALFA", "NOPE"], source="csv", directory="examples/portfolio"
-    )
+    data, failures = load_many(["ALFA", "NOPE"], source="csv", directory="examples/portfolio")
 
     assert set(data) == {"ALFA"}
     assert "NOPE" in failures

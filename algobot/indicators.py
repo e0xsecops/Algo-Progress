@@ -88,9 +88,7 @@ def macd(
         raise ValueError(f"fast ({fast}) must be shorter than slow ({slow})")
     line = ema(series, fast) - ema(series, slow)
     signal_line = line.ewm(span=signal, adjust=False, min_periods=slow + signal - 1).mean()
-    return pd.DataFrame(
-        {"macd": line, "signal": signal_line, "histogram": line - signal_line}
-    )
+    return pd.DataFrame({"macd": line, "signal": signal_line, "histogram": line - signal_line})
 
 
 def bollinger(series: pd.Series, period: int = 20, num_std: float = 2.0) -> pd.DataFrame:
@@ -99,9 +97,7 @@ def bollinger(series: pd.Series, period: int = 20, num_std: float = 2.0) -> pd.D
         raise ValueError("num_std must be positive")
     middle = sma(series, period)
     spread = rolling_std(series, period) * num_std
-    return pd.DataFrame(
-        {"middle": middle, "upper": middle + spread, "lower": middle - spread}
-    )
+    return pd.DataFrame({"middle": middle, "upper": middle + spread, "lower": middle - spread})
 
 
 def donchian(df: pd.DataFrame, period: int = 20) -> pd.DataFrame:

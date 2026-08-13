@@ -173,8 +173,17 @@ def test_cli_flags_override_the_config_file(capsys):
 def test_switching_strategy_drops_stale_config_params(capsys):
     # config.yaml's params belong to ema_cross; buy_hold accepts none of them.
     code = main(
-        ["backtest", "-c", "config.yaml", "--source", "csv", "--path", SAMPLE,
-         "--strategy", "buy_hold"]
+        [
+            "backtest",
+            "-c",
+            "config.yaml",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--strategy",
+            "buy_hold",
+        ]
     )
     assert code == 0
     assert "buy_hold" in capsys.readouterr().out
@@ -211,16 +220,38 @@ def test_optimize_command_ranks_results(capsys):
 
 def test_optimize_skips_invalid_combinations(capsys):
     main(
-        ["optimize", "--source", "csv", "--path", SAMPLE,
-         "--fast", "10,60", "--slow", "20,50", "--min-trades", "1"]
+        [
+            "optimize",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--fast",
+            "10,60",
+            "--slow",
+            "20,50",
+            "--min-trades",
+            "1",
+        ]
     )
     out = capsys.readouterr().out
     assert "skipped" in out  # fast=60 with slow=20 and slow=50 are both invalid
 
 
 def test_optimize_hides_thin_results_unless_asked(capsys):
-    args = ["optimize", "--source", "csv", "--path", SAMPLE, "--grid", "fast=5,10",
-            "--grid", "slow=20,50", "--min-trades", "10000"]
+    args = [
+        "optimize",
+        "--source",
+        "csv",
+        "--path",
+        SAMPLE,
+        "--grid",
+        "fast=5,10",
+        "--grid",
+        "slow=20,50",
+        "--min-trades",
+        "10000",
+    ]
     main(args)
     assert "hid 4 with fewer than 10000 trades" in capsys.readouterr().out
 
@@ -242,9 +273,25 @@ def test_grid_with_no_values_is_rejected(capsys):
 
 def test_walkforward_command_reports_folds(capsys):
     code = main(
-        ["walkforward", "--source", "csv", "--path", SAMPLE, "--symbol", "DEMO",
-         "--strategy", "macd", "--grid", "fast=8,12", "--grid", "slow=21,26",
-         "--splits", "3", "--min-trades", "1"]
+        [
+            "walkforward",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--symbol",
+            "DEMO",
+            "--strategy",
+            "macd",
+            "--grid",
+            "fast=8,12",
+            "--grid",
+            "slow=21,26",
+            "--splits",
+            "3",
+            "--min-trades",
+            "1",
+        ]
     )
     out = capsys.readouterr().out
 
@@ -257,9 +304,25 @@ def test_walkforward_command_reports_folds(capsys):
 
 def test_walkforward_exports(tmp_path, capsys):
     main(
-        ["walkforward", "--source", "csv", "--path", SAMPLE, "--strategy", "macd",
-         "--grid", "fast=8,12", "--grid", "slow=26", "--splits", "2",
-         "--min-trades", "1", "--out", str(tmp_path / "wf")]
+        [
+            "walkforward",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--strategy",
+            "macd",
+            "--grid",
+            "fast=8,12",
+            "--grid",
+            "slow=26",
+            "--splits",
+            "2",
+            "--min-trades",
+            "1",
+            "--out",
+            str(tmp_path / "wf"),
+        ]
     )
     capsys.readouterr()
     assert (tmp_path / "wf" / "oos_equity.csv").exists()
@@ -268,8 +331,19 @@ def test_walkforward_exports(tmp_path, capsys):
 
 def test_montecarlo_command_reports_a_distribution(capsys):
     code = main(
-        ["montecarlo", "--source", "csv", "--path", SAMPLE, "--symbol", "DEMO",
-         "--strategy", "macd", "--trials", "300"]
+        [
+            "montecarlo",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--symbol",
+            "DEMO",
+            "--strategy",
+            "macd",
+            "--trials",
+            "300",
+        ]
     )
     out = capsys.readouterr().out
 
@@ -280,9 +354,23 @@ def test_montecarlo_command_reports_a_distribution(capsys):
 
 def test_montecarlo_returns_method_and_export(tmp_path, capsys):
     code = main(
-        ["montecarlo", "--source", "csv", "--path", SAMPLE, "--strategy", "macd",
-         "--method", "returns", "--trials", "200", "--block", "5",
-         "--out", str(tmp_path / "mc.csv")]
+        [
+            "montecarlo",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--strategy",
+            "macd",
+            "--method",
+            "returns",
+            "--trials",
+            "200",
+            "--block",
+            "5",
+            "--out",
+            str(tmp_path / "mc.csv"),
+        ]
     )
     out = capsys.readouterr().out
 
@@ -294,16 +382,34 @@ def test_montecarlo_returns_method_and_export(tmp_path, capsys):
 
 def test_montecarlo_warns_on_a_thin_sample(capsys):
     main(
-        ["montecarlo", "--source", "csv", "--path", SAMPLE, "--strategy", "donchian",
-         "--trials", "200"]
+        [
+            "montecarlo",
+            "--source",
+            "csv",
+            "--path",
+            SAMPLE,
+            "--strategy",
+            "donchian",
+            "--trials",
+            "200",
+        ]
     )
     assert "Caution: only" in capsys.readouterr().out
 
 
 def test_portfolio_command_combines_symbols(capsys):
     code = main(
-        ["portfolio", "--source", "csv", "--path", "examples/portfolio",
-         "--symbols", "ALFA,BETA,GAMA", "--strategy", "macd"]
+        [
+            "portfolio",
+            "--source",
+            "csv",
+            "--path",
+            "examples/portfolio",
+            "--symbols",
+            "ALFA,BETA,GAMA",
+            "--strategy",
+            "macd",
+        ]
     )
     out = capsys.readouterr().out
 
@@ -316,9 +422,21 @@ def test_portfolio_command_combines_symbols(capsys):
 
 def test_portfolio_command_accepts_weights_and_exports(tmp_path, capsys):
     code = main(
-        ["portfolio", "--source", "csv", "--path", "examples/portfolio",
-         "--symbols", "ALFA,BETA", "--weights", "3,1", "--strategy", "macd",
-         "--out", str(tmp_path / "pf")]
+        [
+            "portfolio",
+            "--source",
+            "csv",
+            "--path",
+            "examples/portfolio",
+            "--symbols",
+            "ALFA,BETA",
+            "--weights",
+            "3,1",
+            "--strategy",
+            "macd",
+            "--out",
+            str(tmp_path / "pf"),
+        ]
     )
     out = capsys.readouterr().out
 
@@ -329,12 +447,28 @@ def test_portfolio_command_accepts_weights_and_exports(tmp_path, capsys):
 
 
 def test_portfolio_rejects_a_single_symbol_and_bad_weights(capsys):
-    assert main(["portfolio", "--source", "csv", "--path", "examples/portfolio",
-                 "--symbols", "ALFA"]) == 2
+    assert (
+        main(["portfolio", "--source", "csv", "--path", "examples/portfolio", "--symbols", "ALFA"])
+        == 2
+    )
     assert "at least 2 symbols" in capsys.readouterr().err
 
-    assert main(["portfolio", "--source", "csv", "--path", "examples/portfolio",
-                 "--symbols", "ALFA,BETA", "--weights", "1,2,3"]) == 2
+    assert (
+        main(
+            [
+                "portfolio",
+                "--source",
+                "csv",
+                "--path",
+                "examples/portfolio",
+                "--symbols",
+                "ALFA,BETA",
+                "--weights",
+                "1,2,3",
+            ]
+        )
+        == 2
+    )
     assert "one weight per symbol" in capsys.readouterr().err
 
 

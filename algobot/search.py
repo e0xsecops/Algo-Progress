@@ -92,7 +92,7 @@ def expand_grid(grid: dict[str, list[Any]]) -> Iterator[dict[str, Any]]:
         return
     keys = list(grid)
     for combo in itertools.product(*(grid[k] for k in keys)):
-        yield dict(zip(keys, combo))
+        yield dict(zip(keys, combo, strict=True))
 
 
 def grid_size(grid: dict[str, list[Any]]) -> int:

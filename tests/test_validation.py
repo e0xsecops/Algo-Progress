@@ -47,7 +47,7 @@ def test_test_windows_are_contiguous_disjoint_and_cover_the_tail():
     assert positions[0][2] == 500  # testing starts after the first training window
     assert positions[-1][3] == 1_000  # and runs to the last bar
 
-    for (_, _, start, end), (_, _, next_start, _) in zip(positions, positions[1:]):
+    for (_, _, start, end), (_, _, next_start, _) in zip(positions, positions[1:], strict=False):
         assert end == next_start  # no gap, no overlap
         assert start < end
 
@@ -92,7 +92,7 @@ def test_walk_forward_produces_one_fold_per_split(wf):
 
 
 def test_folds_are_chronological_and_do_not_overlap(wf):
-    for previous, current in zip(wf.folds, wf.folds[1:]):
+    for previous, current in zip(wf.folds, wf.folds[1:], strict=False):
         assert previous.test_end <= current.test_start
         assert previous.train_end <= previous.test_start
 
@@ -173,8 +173,14 @@ def test_walk_forward_rejects_bad_input(long_bars):
 
 def test_walk_forward_is_deterministic(long_bars, wf):
     again = walk_forward(
-        long_bars, "ema_cross", GRID, base_params=BASE, n_splits=4, train_size=0.5,
-        min_trades=1, symbol="SYN",
+        long_bars,
+        "ema_cross",
+        GRID,
+        base_params=BASE,
+        n_splits=4,
+        train_size=0.5,
+        min_trades=1,
+        symbol="SYN",
     )
     pd.testing.assert_series_equal(wf.equity, again.equity)
 

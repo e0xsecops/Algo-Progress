@@ -51,9 +51,7 @@ def get_strategy(name: str, **params: Any) -> Strategy:
     try:
         cls = REGISTRY[name]
     except KeyError:
-        raise ValueError(
-            f"unknown strategy {name!r}; available: {sorted(REGISTRY)}"
-        ) from None
+        raise ValueError(f"unknown strategy {name!r}; available: {sorted(REGISTRY)}") from None
     return cls(**params)
 
 

@@ -132,9 +132,11 @@ def from_trades(
         return result
 
     # Equity as it stood when each trade opened.
-    equity_at_entry = equity.reindex(
-        equity.index.union(pd.DatetimeIndex(trades["entry_time"]))
-    ).ffill().reindex(pd.DatetimeIndex(trades["entry_time"]))
+    equity_at_entry = (
+        equity.reindex(equity.index.union(pd.DatetimeIndex(trades["entry_time"])))
+        .ffill()
+        .reindex(pd.DatetimeIndex(trades["entry_time"]))
+    )
     basis = equity_at_entry.to_numpy(dtype=float)
     basis = np.where(np.isfinite(basis) & (basis > 0), basis, initial)
 

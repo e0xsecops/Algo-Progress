@@ -10,7 +10,6 @@ from algobot.indicators import ema
 from algobot.strategies import FAMILIES, REGISTRY, available, get_strategy, register
 from algobot.strategies.base import Strategy
 
-
 ALL_STRATEGIES = available()
 
 
@@ -110,9 +109,7 @@ def frame_from(close: np.ndarray) -> pd.DataFrame:
 
 def test_rsi_reversion_buys_weakness_and_exits_on_recovery():
     # A slide into oversold, then a recovery back through the midline.
-    frame = frame_from(
-        np.concatenate([np.linspace(100, 70, 30), np.linspace(70, 105, 30)])
-    )
+    frame = frame_from(np.concatenate([np.linspace(100, 70, 30), np.linspace(70, 105, 30)]))
     strategy = get_strategy("rsi_reversion", period=14, oversold=30, exit_level=50)
 
     signals = strategy.generate_signals(frame)
@@ -207,8 +204,9 @@ def test_invalid_parameter_combinations_are_rejected():
 
 
 def test_missing_attribute_still_raises_attribute_error():
+    """__getattr__ forwards to params, but must not swallow genuine typos."""
     with pytest.raises(AttributeError):
-        get_strategy("ema_cross").nonexistent
+        get_strategy("ema_cross").nonexistent  # noqa: B018 - the access is the test
 
 
 def test_signals_are_bounded_and_aligned(bars):

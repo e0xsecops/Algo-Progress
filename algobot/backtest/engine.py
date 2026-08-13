@@ -121,16 +121,10 @@ class Backtester:
         index = df.index
 
         signals = (
-            strategy.generate_signals(df)
-            .reindex(index)
-            .astype(float)
-            .fillna(0.0)
-            .clip(-1.0, 1.0)
+            strategy.generate_signals(df).reindex(index).astype(float).fillna(0.0).clip(-1.0, 1.0)
         )
         atr_values = (
-            risk.volatility(df).to_numpy(dtype=float)
-            if risk.uses_atr
-            else np.full(n, np.nan)
+            risk.volatility(df).to_numpy(dtype=float) if risk.uses_atr else np.full(n, np.nan)
         )
 
         open_ = df["open"].to_numpy(dtype=float)

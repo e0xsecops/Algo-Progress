@@ -192,9 +192,7 @@ def load_synthetic(
     dt = 1.0 / ppy
     rng = np.random.default_rng(seed)
 
-    shocks = rng.normal(
-        (annual_drift - 0.5 * annual_vol**2) * dt, annual_vol * np.sqrt(dt), size=n
-    )
+    shocks = rng.normal((annual_drift - 0.5 * annual_vol**2) * dt, annual_vol * np.sqrt(dt), size=n)
     close = start_price * np.exp(np.cumsum(shocks))
     open_ = np.concatenate([[start_price], close[:-1]])
 

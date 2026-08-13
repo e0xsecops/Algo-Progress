@@ -44,8 +44,12 @@ class Strategy(ABC):
                 f"{type(self).__name__!r} object has no attribute {item!r}"
             ) from None
 
-    def validate(self) -> None:
-        """Hook for subclasses to reject nonsensical parameter combinations."""
+    def validate(self) -> None:  # noqa: B027 - an optional hook, not an abstract method
+        """Hook for subclasses to reject nonsensical parameter combinations.
+
+        Deliberately concrete and empty: a strategy with no invalid parameter
+        combinations should not have to implement anything.
+        """
 
     @property
     def warmup(self) -> int:

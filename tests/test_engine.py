@@ -300,12 +300,8 @@ def test_future_bars_cannot_change_past_results(bars):
     tampered_bars.iloc[cut:, :] *= 5.0
     tampered = run_backtest(tampered_bars, strategy, config, risk)
 
-    pd.testing.assert_series_equal(
-        original.equity.iloc[:cut], tampered.equity.iloc[:cut]
-    )
-    pd.testing.assert_series_equal(
-        original.positions.iloc[:cut], tampered.positions.iloc[:cut]
-    )
+    pd.testing.assert_series_equal(original.equity.iloc[:cut], tampered.equity.iloc[:cut])
+    pd.testing.assert_series_equal(original.positions.iloc[:cut], tampered.positions.iloc[:cut])
 
     early = original.trades[original.trades["exit_time"] < bars.index[cut]]
     tampered_early = tampered.trades[tampered.trades["exit_time"] < bars.index[cut]]
@@ -326,9 +322,7 @@ def test_truncating_the_data_reproduces_the_same_history(bars):
     short = run_backtest(bars.iloc[:cut], strategy, config, risk)
 
     # The final bar is excluded: the short run liquidates there, the long one does not.
-    pd.testing.assert_series_equal(
-        full.equity.iloc[: cut - 1], short.equity.iloc[: cut - 1]
-    )
+    pd.testing.assert_series_equal(full.equity.iloc[: cut - 1], short.equity.iloc[: cut - 1])
 
 
 # -- interface ---------------------------------------------------------------

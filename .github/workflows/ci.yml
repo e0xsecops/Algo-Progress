@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
+
+      # The suite must never depend on a network call. Running it again with
+      # outbound DNS broken proves the offline fixtures really are offline.
+      - name: Verify the suite runs without a network
+        if: matrix.python-version == '3.12'
+        run: pytest -q -p no:cacheprovider
+        env:
+          http_proxy: http://127.0.0.1:9
+          https_proxy: http://127.0.0.1:9
+
+  smoke:
+    name: End-to-end commands
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: backtest
+        run: |
+          python -m algobot backtest --source csv --path examples/sample_bars.csv \
+            --symbol DEMO --report report.html --out results/
+
+      - name: optimize
+        run: |
+          python -m algobot optimize --source csv --path examples/sample_bars.csv \
+            --strategy macd --grid fast=8,12 --grid slow=21,26 --min-trades 1
+
+      - name: walkforward
+        run: |
+          python -m algobot walkforward --source csv --path examples/sample_bars.csv \
+            --strategy macd --grid fast=8,12 --grid slow=26 --splits 3 --min-trades 1
+
+      - name: montecarlo
+        run: |
+          python -m algobot montecarlo --source csv --path examples/sample_bars.csv \
+            --strategy macd --trials 500
+
+      - name: portfolio
+        run: |
+          python -m algobot portfolio --source csv --path examples/portfolio \
+            --symbols ALFA,BETA,GAMA --strategy macd
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-report
+          path: |
+            report.html
+            results/
+          retention-days: 7
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Check
+        run: |
+          ruff check .
+          ruff format --check .

@@ -127,12 +127,9 @@ def equity_chart(equity: pd.Series, benchmark: pd.Series | None = None) -> str:
     pad = (hi - lo) * 0.05 or abs(hi) * 0.05 or 1.0
     lo, hi = lo - pad, hi + pad
 
-    paths = "".join(
-        f'<path class="{name}" d="{_path(s, box, lo, hi)}"/>' for name, s in lines
-    )
-    legend = (
-        '<span class="key equity">strategy</span>'
-        + ('<span class="key benchmark">buy &amp; hold</span>' if len(lines) > 1 else "")
+    paths = "".join(f'<path class="{name}" d="{_path(s, box, lo, hi)}"/>' for name, s in lines)
+    legend = '<span class="key equity">strategy</span>' + (
+        '<span class="key benchmark">buy &amp; hold</span>' if len(lines) > 1 else ""
     )
 
     return (
@@ -235,12 +232,8 @@ def monthly_table(equity: pd.Series) -> str:
                 continue
             intensity = min(1.0, abs(value) / scale)
             tone = "pos" if value >= 0 else "neg"
-            cells.append(
-                f'<td class="{tone}" style="--i:{intensity:.2f}">{value * 100:,.1f}</td>'
-            )
-        total = next(
-            (v for ts, v in yearly.items() if ts.year == year), None
-        )
+            cells.append(f'<td class="{tone}" style="--i:{intensity:.2f}">{value * 100:,.1f}</td>')
+        total = next((v for ts, v in yearly.items() if ts.year == year), None)
         total_cell = (
             f'<td class="total {"pos" if total >= 0 else "neg"}">{total * 100:,.1f}</td>'
             if total is not None
@@ -294,8 +287,11 @@ def _detail_table(m: Metrics, benchmark: Metrics | None) -> str:
         return f"{v * 100:,.2f}%"
 
     rows = [
-        ("Period", f"{m.start.date() if m.start is not None else '-'} to "
-                   f"{m.end.date() if m.end is not None else '-'} ({m.years:.2f} years)"),
+        (
+            "Period",
+            f"{m.start.date() if m.start is not None else '-'} to "
+            f"{m.end.date() if m.end is not None else '-'} ({m.years:.2f} years)",
+        ),
         ("Starting equity", f"{m.initial_equity:,.2f}"),
         ("Final equity", f"{m.final_equity:,.2f}"),
         ("Annual volatility", pct(m.annual_volatility)),
@@ -317,9 +313,7 @@ def _detail_table(m: Metrics, benchmark: Metrics | None) -> str:
             ("Benchmark Sharpe", f"{benchmark.sharpe:.2f}"),
             ("Benchmark max drawdown", pct(benchmark.max_drawdown)),
         ]
-    body = "".join(
-        f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in rows
-    )
+    body = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in rows)
     return f'<table class="detail"><tbody>{body}</tbody></table>'
 
 
@@ -328,10 +322,23 @@ def _trades_table(trades: pd.DataFrame, limit: int = 50) -> str:
         return "<p class='empty'>This run closed no trades.</p>"
 
     shown = trades.tail(limit)
-    columns = [c for c in
-               ["symbol", "entry_time", "exit_time", "direction", "quantity",
-                "entry_price", "exit_price", "pnl", "return_pct", "bars_held", "exit_reason"]
-               if c in shown.columns]
+    columns = [
+        c
+        for c in [
+            "symbol",
+            "entry_time",
+            "exit_time",
+            "direction",
+            "quantity",
+            "entry_price",
+            "exit_price",
+            "pnl",
+            "return_pct",
+            "bars_held",
+            "exit_reason",
+        ]
+        if c in shown.columns
+    ]
 
     header = "".join(f"<th>{html.escape(c.replace('_', ' '))}</th>" for c in columns)
     rows = []
@@ -452,9 +459,7 @@ def build_html(
     sections = [s for s in sections if s]
     sections.extend(extra_sections or [])
 
-    body = "".join(
-        f"<h2>{html.escape(name)}</h2>{content}" for name, content in sections
-    )
+    body = "".join(f"<h2>{html.escape(name)}</h2>{content}" for name, content in sections)
 
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"

@@ -90,8 +90,12 @@ class WalkForwardResult:
         search was fitting noise. Anything far above 1.0 is usually luck, not a
         strategy that works better on unseen data.
         """
-        in_sample = np.mean([f.train_metrics.total_return for f in self.folds]) if self.folds else 0.0
-        out_sample = np.mean([f.test_metrics.total_return for f in self.folds]) if self.folds else 0.0
+        in_sample = (
+            np.mean([f.train_metrics.total_return for f in self.folds]) if self.folds else 0.0
+        )
+        out_sample = (
+            np.mean([f.test_metrics.total_return for f in self.folds]) if self.folds else 0.0
+        )
         if in_sample <= 0:
             return float("nan")
         return float(out_sample / in_sample)
@@ -138,7 +142,9 @@ class WalkForwardResult:
         out = format_metrics(self.metrics, title + " [out-of-sample only]")
 
         efficiency = self.efficiency
-        efficiency_text = "n/a (no in-sample profit)" if efficiency != efficiency else f"{efficiency:.2f}"
+        efficiency_text = (
+            "n/a (no in-sample profit)" if efficiency != efficiency else f"{efficiency:.2f}"
+        )
         out += (
             f"\nFolds: {len(self.folds)} ({self.scheme}, selected by {self.objective})"
             f"\nWalk-forward efficiency: {efficiency_text}"
@@ -148,7 +154,9 @@ class WalkForwardResult:
         return out
 
 
-def _slice_positions(n: int, n_splits: int, train_size: float, scheme: str) -> list[tuple[int, int, int, int]]:
+def _slice_positions(
+    n: int, n_splits: int, train_size: float, scheme: str
+) -> list[tuple[int, int, int, int]]:
     """Compute (train_start, train_end, test_start, test_end) index positions."""
     if n_splits < 1:
         raise ValueError("n_splits must be >= 1")
@@ -277,9 +285,7 @@ def walk_forward(
             oos_trades.append(fold_trades)
 
     stitched = _stitch(oos_returns, config.initial_cash)
-    all_trades = (
-        pd.concat(oos_trades, ignore_index=True) if oos_trades else pd.DataFrame()
-    )
+    all_trades = pd.concat(oos_trades, ignore_index=True) if oos_trades else pd.DataFrame()
     positions = pd.concat(oos_positions) if oos_positions else pd.Series(dtype=float)
     positions = positions[~positions.index.duplicated(keep="first")].sort_index()
 
@@ -310,5 +316,7 @@ def _stitch(segments: list[pd.Series], initial_cash: float) -> pd.Series:
     returns = returns[~returns.index.duplicated(keep="first")].sort_index()
     equity = initial_cash * (1.0 + returns).cumprod()
     # Prepend the starting point so the curve begins at the initial cash level.
-    first = equity.index[0] - (equity.index[1] - equity.index[0] if len(equity) > 1 else pd.Timedelta(days=1))
+    first = equity.index[0] - (
+        equity.index[1] - equity.index[0] if len(equity) > 1 else pd.Timedelta(days=1)
+    )
     return pd.concat([pd.Series([initial_cash], index=[first]), equity])

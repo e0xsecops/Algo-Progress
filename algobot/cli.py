@@ -1,9 +1,9 @@
 """Command line interface.
 
-    python -m algobot backtest --source synthetic --symbol DEMO
-    python -m algobot backtest --symbol AAPL --start 2018-01-01 --out results/aapl
-    python -m algobot optimize --fast 5,10,20 --slow 50,100,200
-    python -m algobot strategies
+python -m algobot backtest --source synthetic --symbol DEMO
+python -m algobot backtest --symbol AAPL --start 2018-01-01 --out results/aapl
+python -m algobot optimize --fast 5,10,20 --slow 50,100,200
+python -m algobot strategies
 """
 
 from __future__ import annotations
@@ -162,7 +162,9 @@ def cmd_backtest(args: argparse.Namespace) -> int:
 
     print(result.summary())
     print(f"\nSizing: {result.meta['risk']}")
-    print(f"Bars: {result.meta['bars']} (warmup {result.meta['warmup']}), fill: {result.meta['fill']}")
+    print(
+        f"Bars: {result.meta['bars']} (warmup {result.meta['warmup']}), fill: {result.meta['fill']}"
+    )
 
     if args.show_trades and len(result.trades):
         print("\nTrades")
@@ -380,7 +382,7 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
                 f"got {len(values)} weight(s) for {len(symbols)} symbol(s); "
                 "supply one weight per symbol or omit --weights for equal sizing"
             )
-        weights = dict(zip(symbols, values))
+        weights = dict(zip(symbols, values, strict=True))
 
     log.info("loading %d symbol(s)", len(symbols))
     data, load_failures = load_many(
