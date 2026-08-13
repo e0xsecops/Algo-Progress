@@ -152,8 +152,10 @@ def load_yahoo(
     )
     if raw is None or len(raw) == 0:
         raise DataError(
-            f"Yahoo returned no data for {symbol!r} between {start} and {end} at {interval}; "
-            "check the ticker, the date range, and that the interval is supported"
+            f"Yahoo returned no data for {symbol!r} between {start} and {end} at {interval}. "
+            "Check the ticker, the date range and that the interval is supported. "
+            "If the log above shows a connection error, this machine cannot reach "
+            "Yahoo - export the bars to CSV elsewhere and use --source csv."
         )
     return normalize(raw, symbol=symbol)
 
@@ -190,9 +192,7 @@ def load_synthetic(
     dt = 1.0 / ppy
     rng = np.random.default_rng(seed)
 
-    shocks = rng.normal(
-        (annual_drift - 0.5 * annual_vol**2) * dt, annual_vol * np.sqrt(dt), size=n
-    )
+    shocks = rng.normal((annual_drift - 0.5 * annual_vol**2) * dt, annual_vol * np.sqrt(dt), size=n)
     close = start_price * np.exp(np.cumsum(shocks))
     open_ = np.concatenate([[start_price], close[:-1]])
 

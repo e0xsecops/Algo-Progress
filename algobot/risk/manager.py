@@ -82,7 +82,9 @@ class RiskManager:
 
         return float(max(0.0, cap))
 
-    def stop_levels(self, entry_price: float, direction: int, atr_value: float | None) -> StopLevels:
+    def stop_levels(
+        self, entry_price: float, direction: int, atr_value: float | None
+    ) -> StopLevels:
         """Stop-loss and take-profit prices for a freshly opened position."""
         cfg = self.config
         if direction == 0 or atr_value is None or not np.isfinite(atr_value) or atr_value <= 0:
