@@ -14,6 +14,8 @@ from algobot.strategies.base import Strategy
 
 
 class BuyHoldStrategy(Strategy):
+    """Always long: the benchmark an active strategy has to beat."""
+
     name: ClassVar[str] = "buy_hold"
     params_schema: ClassVar[dict[str, Any]] = {}
 

@@ -17,6 +17,8 @@ from algobot.strategies.base import Strategy
 
 
 class EmaCrossStrategy(Strategy):
+    """Long while the fast EMA is above the slow EMA, gated by a trend filter."""
+
     name: ClassVar[str] = "ema_cross"
     params_schema: ClassVar[dict[str, Any]] = {
         "fast": 20,

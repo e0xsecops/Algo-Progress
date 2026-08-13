@@ -152,8 +152,10 @@ def load_yahoo(
     )
     if raw is None or len(raw) == 0:
         raise DataError(
-            f"Yahoo returned no data for {symbol!r} between {start} and {end} at {interval}; "
-            "check the ticker, the date range, and that the interval is supported"
+            f"Yahoo returned no data for {symbol!r} between {start} and {end} at {interval}. "
+            "Check the ticker, the date range and that the interval is supported. "
+            "If the log above shows a connection error, this machine cannot reach "
+            "Yahoo - export the bars to CSV elsewhere and use --source csv."
         )
     return normalize(raw, symbol=symbol)
 
