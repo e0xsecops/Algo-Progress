@@ -139,17 +139,22 @@ python -m algobot optimize --source csv --path examples/sample_bars.csv \
 ```
 
 ```
- fast  slow   score  return_pct  sharpe  max_dd_pct  trades  win_rate_pct
+Tested 9 combination(s)
+Ranked by sharpe (top 15):
+
+ fast  slow   score  return_pct  sharpe  max_dd_pct  trades  win_rate_pct   (columns trimmed)
     8    26 -0.4182       -2.86  -0.418       -4.77      34          32.4
     8    34 -0.5817       -3.82  -0.582       -4.82      33          27.3
+    8    21 -0.6260       -4.22  -0.626       -5.04      38          28.9
 ```
 
 The tool deliberately makes this step feel unsatisfying. Parameter sets with
 too few trades are flagged and hidden (`--min-trades`, `--include-thin`),
 infinite scores can't win by accident, and the footer tells you to go validate:
 
-> Caution: 6 combinations were scored against the same 750 bars, so the top row
-> is the best fit to this sample rather than the best strategy.
+> Caution: 9 combinations were scored against the same 750 bars, so the top row
+> is the best fit to this sample rather than the best strategy. Confirm it with:
+> `python -m algobot walkforward --strategy macd --grid fast=8,12,16 --grid slow=21,26,34`
 
 ### Step 3 — Validate: does it survive data the search never saw?
 
