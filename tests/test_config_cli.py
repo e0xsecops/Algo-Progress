@@ -300,6 +300,44 @@ def test_montecarlo_warns_on_a_thin_sample(capsys):
     assert "Caution: only" in capsys.readouterr().out
 
 
+def test_portfolio_command_combines_symbols(capsys):
+    code = main(
+        ["portfolio", "--source", "csv", "--path", "examples/portfolio",
+         "--symbols", "ALFA,BETA,GAMA", "--strategy", "macd"]
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "Portfolio:" in out
+    assert "Per-symbol contribution" in out
+    assert "Sleeve return correlation" in out
+    assert "Average pairwise correlation" in out
+
+
+def test_portfolio_command_accepts_weights_and_exports(tmp_path, capsys):
+    code = main(
+        ["portfolio", "--source", "csv", "--path", "examples/portfolio",
+         "--symbols", "ALFA,BETA", "--weights", "3,1", "--strategy", "macd",
+         "--out", str(tmp_path / "pf")]
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "75.0" in out  # ALFA normalised to 75% of capital
+    assert (tmp_path / "pf" / "portfolio_equity.csv").exists()
+    assert (tmp_path / "pf" / "contributions.csv").exists()
+
+
+def test_portfolio_rejects_a_single_symbol_and_bad_weights(capsys):
+    assert main(["portfolio", "--source", "csv", "--path", "examples/portfolio",
+                 "--symbols", "ALFA"]) == 2
+    assert "at least 2 symbols" in capsys.readouterr().err
+
+    assert main(["portfolio", "--source", "csv", "--path", "examples/portfolio",
+                 "--symbols", "ALFA,BETA", "--weights", "1,2,3"]) == 2
+    assert "one weight per symbol" in capsys.readouterr().err
+
+
 def test_strategies_command_lists_parameters(capsys):
     assert main(["strategies"]) == 0
     out = capsys.readouterr().out

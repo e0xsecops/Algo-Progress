@@ -14,12 +14,14 @@ import logging
 import sys
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from algobot import __version__
 from algobot.backtest import Backtester
 from algobot.config import apply_overrides, load_config
 from algobot.data import DataError, load
+from algobot.portfolio import load_many, run_portfolio
 from algobot.risk import RiskManager
 from algobot.search import OBJECTIVES, grid_search, grid_size
 from algobot.strategies import FAMILIES, available, get_strategy
@@ -358,6 +360,73 @@ def cmd_montecarlo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_portfolio(args: argparse.Namespace) -> int:
+    """Run one strategy across several instruments and combine the sleeves."""
+    config, params = _resolve(args)
+    symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
+    if len(symbols) < 2:
+        raise ValueError("portfolio needs at least 2 symbols, e.g. --symbols AAPL,MSFT,SPY")
+
+    weights = None
+    if args.weights:
+        values = [float(w) for w in args.weights.split(",")]
+        if len(values) != len(symbols):
+            raise ValueError(
+                f"got {len(values)} weight(s) for {len(symbols)} symbol(s); "
+                "supply one weight per symbol or omit --weights for equal sizing"
+            )
+        weights = dict(zip(symbols, values))
+
+    log.info("loading %d symbol(s)", len(symbols))
+    data, load_failures = load_many(
+        symbols,
+        source=config.data.source,
+        start=config.data.start,
+        end=config.data.end,
+        interval=config.data.interval,
+        directory=config.data.path,
+    )
+
+    result = run_portfolio(
+        data,
+        config.strategy.name,
+        strategy_params=params,
+        config=config.backtest,
+        risk=RiskManager(config.risk),
+        weights=weights,
+    )
+    result.failures.update(load_failures)
+
+    print(result.summary())
+    print("\nPer-symbol contribution\n")
+    print(result.contributions().to_string(index=False))
+
+    correlation = result.correlation()
+    if not correlation.empty:
+        print("\nSleeve return correlation\n")
+        print(correlation.round(2).to_string())
+        upper = correlation.where(np.triu(np.ones(correlation.shape), k=1).astype(bool))
+        print(f"\nAverage pairwise correlation: {upper.stack().mean():.2f}")
+        print(
+            "The lower that number, the more the extra symbols are actually "
+            "buying you. Near 1.0 and you own one position in four disguises."
+        )
+
+    if args.out:
+        from pathlib import Path
+
+        path = Path(args.out)
+        path.mkdir(parents=True, exist_ok=True)
+        result.equity.to_frame("equity").to_csv(path / "portfolio_equity.csv")
+        result.contributions().to_csv(path / "contributions.csv", index=False)
+        if len(result.trades):
+            result.trades.to_csv(path / "trades.csv", index=False)
+        if not correlation.empty:
+            correlation.to_csv(path / "correlation.csv")
+        print(f"\nWrote {path}/portfolio_equity.csv, contributions.csv, trades.csv")
+    return 0
+
+
 def cmd_strategies(args: argparse.Namespace) -> int:
     from algobot.strategies import REGISTRY
 
@@ -478,6 +547,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mc.add_argument("--out", help="write every simulated path outcome to this CSV path")
     mc.set_defaults(func=cmd_montecarlo)
+
+    pf = sub.add_parser("portfolio", help="run one strategy across several instruments")
+    _add_common(pf)
+    pf.add_argument(
+        "--symbols",
+        required=True,
+        metavar="A,B,C",
+        help="comma-separated symbols; with --source csv, files are read from "
+        "<--path>/<SYMBOL>.csv",
+    )
+    pf.add_argument(
+        "--weights",
+        metavar="W1,W2,W3",
+        help="capital split, one weight per symbol (default: equal); "
+        "values are normalised, so 2,1,1 means 50/25/25",
+    )
+    pf.add_argument("--out", help="directory for portfolio_equity.csv and friends")
+    pf.set_defaults(func=cmd_portfolio)
 
     ls = sub.add_parser("strategies", help="list registered strategies and parameters")
     ls.set_defaults(func=cmd_strategies)
