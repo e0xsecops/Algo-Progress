@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 from algobot.cli import _coerce, _parse_params, main
@@ -191,8 +192,10 @@ def test_optimize_command_ranks_results(capsys):
             "5,10",
             "--slow",
             "20,50",
-            "--sort",
+            "--objective",
             "sharpe",
+            "--min-trades",
+            "1",
             "--top",
             "3",
         ]
@@ -202,21 +205,99 @@ def test_optimize_command_ranks_results(capsys):
     assert code == 0
     assert "Tested 4 combination(s)" in out
     assert "sharpe" in out and "max_dd_pct" in out
+    # The ranking must point the user at the validation step, not stop at a winner.
+    assert "walkforward" in out
 
 
 def test_optimize_skips_invalid_combinations(capsys):
     main(
         ["optimize", "--source", "csv", "--path", SAMPLE,
-         "--fast", "10,60", "--slow", "20,50"]
+         "--fast", "10,60", "--slow", "20,50", "--min-trades", "1"]
     )
     out = capsys.readouterr().out
     assert "skipped" in out  # fast=60 with slow=20 and slow=50 are both invalid
+
+
+def test_optimize_hides_thin_results_unless_asked(capsys):
+    args = ["optimize", "--source", "csv", "--path", SAMPLE, "--grid", "fast=5,10",
+            "--grid", "slow=20,50", "--min-trades", "10000"]
+    main(args)
+    assert "hid 4 with fewer than 10000 trades" in capsys.readouterr().out
+
+    main(args + ["--include-thin"])
+    assert "hid" not in capsys.readouterr().out
 
 
 def test_optimize_requires_a_grid(capsys):
     code = main(["optimize", "--source", "csv", "--path", SAMPLE])
     assert code == 2
     assert "at least one --grid" in capsys.readouterr().err
+
+
+def test_grid_with_no_values_is_rejected(capsys):
+    code = main(["optimize", "--source", "csv", "--path", SAMPLE, "--grid", "fast="])
+    assert code == 2
+    assert "lists no values" in capsys.readouterr().err
+
+
+def test_walkforward_command_reports_folds(capsys):
+    code = main(
+        ["walkforward", "--source", "csv", "--path", SAMPLE, "--symbol", "DEMO",
+         "--strategy", "macd", "--grid", "fast=8,12", "--grid", "slow=21,26",
+         "--splits", "3", "--min-trades", "1"]
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "out-of-sample" in out
+    assert "Walk-forward efficiency" in out
+    assert "Parameter stability across folds" in out
+    assert out.count("\n 1 ") or "fold" in out
+
+
+def test_walkforward_exports(tmp_path, capsys):
+    main(
+        ["walkforward", "--source", "csv", "--path", SAMPLE, "--strategy", "macd",
+         "--grid", "fast=8,12", "--grid", "slow=26", "--splits", "2",
+         "--min-trades", "1", "--out", str(tmp_path / "wf")]
+    )
+    capsys.readouterr()
+    assert (tmp_path / "wf" / "oos_equity.csv").exists()
+    assert (tmp_path / "wf" / "folds.csv").exists()
+
+
+def test_montecarlo_command_reports_a_distribution(capsys):
+    code = main(
+        ["montecarlo", "--source", "csv", "--path", SAMPLE, "--symbol", "DEMO",
+         "--strategy", "macd", "--trials", "300"]
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "Monte Carlo robustness" in out
+    assert "Probability of profit" in out
+
+
+def test_montecarlo_returns_method_and_export(tmp_path, capsys):
+    code = main(
+        ["montecarlo", "--source", "csv", "--path", SAMPLE, "--strategy", "macd",
+         "--method", "returns", "--trials", "200", "--block", "5",
+         "--out", str(tmp_path / "mc.csv")]
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0 and "block=5" in out
+    exported = pd.read_csv(tmp_path / "mc.csv")
+    assert len(exported) == 200
+    assert {"total_return", "final_equity", "max_drawdown"} == set(exported.columns)
+
+
+def test_montecarlo_warns_on_a_thin_sample(capsys):
+    main(
+        ["montecarlo", "--source", "csv", "--path", SAMPLE, "--strategy", "donchian",
+         "--trials", "200"]
+    )
+    assert "Caution: only" in capsys.readouterr().out
 
 
 def test_strategies_command_lists_parameters(capsys):

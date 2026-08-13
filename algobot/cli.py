@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import argparse
-import itertools
 import json
 import logging
 import sys
@@ -22,7 +21,9 @@ from algobot.backtest import Backtester
 from algobot.config import apply_overrides, load_config
 from algobot.data import DataError, load
 from algobot.risk import RiskManager
-from algobot.strategies import available, get_strategy
+from algobot.search import OBJECTIVES, grid_search, grid_size
+from algobot.strategies import FAMILIES, available, get_strategy
+from algobot.validation import monte_carlo, walk_forward
 
 log = logging.getLogger("algobot")
 
@@ -186,68 +187,72 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_grid(args: argparse.Namespace) -> dict[str, list[Any]]:
+    """Assemble the parameter grid from --grid and the --fast/--slow shorthands."""
+    grid: dict[str, list[Any]] = {}
+    for spec in getattr(args, "grid", None) or []:
+        if "=" not in spec:
+            raise ValueError(f"--grid expects key=v1,v2,..., got {spec!r}")
+        key, _, values = spec.partition("=")
+        parsed = [_coerce(v) for v in values.split(",") if v != ""]
+        if not parsed:
+            raise ValueError(f"--grid {spec!r} lists no values")
+        grid[key.strip()] = parsed
+    if getattr(args, "fast", None):
+        grid["fast"] = _int_list(args.fast)
+    if getattr(args, "slow", None):
+        grid["slow"] = _int_list(args.slow)
+    if not grid:
+        raise ValueError(
+            "this command needs at least one --grid key=v1,v2 (or the --fast/--slow shorthands)"
+        )
+    return grid
+
+
 def cmd_optimize(args: argparse.Namespace) -> int:
     """Grid-search strategy parameters and rank the runs.
 
     Treat the output as a hypothesis, not a result: the best cell of a grid is
-    partly luck, and the more cells there are the luckier it gets. Re-test the
-    winner on a period the search never saw.
+    partly luck, and the more cells there are the luckier it gets. Confirm the
+    winner with `walkforward`, which never lets a search see its own test data.
     """
     config, base_params = _resolve(args)
     df = _load_bars(config)
+    grid = _build_grid(args)
 
-    grid: dict[str, list[Any]] = {}
-    for spec in args.grid or []:
-        if "=" not in spec:
-            raise ValueError(f"--grid expects key=v1,v2,..., got {spec!r}")
-        key, _, values = spec.partition("=")
-        grid[key.strip()] = [_coerce(v) for v in values.split(",") if v != ""]
-    if args.fast:
-        grid["fast"] = _int_list(args.fast)
-    if args.slow:
-        grid["slow"] = _int_list(args.slow)
-    if not grid:
-        raise ValueError("optimize needs at least one --grid key=v1,v2 (or --fast/--slow)")
+    log.info("testing %d combination(s)", grid_size(grid))
+    result = grid_search(
+        df,
+        config.strategy.name,
+        grid,
+        base_params=base_params,
+        config=config.backtest,
+        risk=RiskManager(config.risk),
+        objective=args.objective,
+        min_trades=args.min_trades,
+    )
 
-    backtester = Backtester(config.backtest, RiskManager(config.risk))
-    keys = list(grid)
-    rows = []
-    skipped = 0
-
-    for combo in itertools.product(*(grid[k] for k in keys)):
-        params = {**base_params, **dict(zip(keys, combo))}
-        try:
-            strategy = get_strategy(config.strategy.name, **params)
-        except ValueError as exc:  # invalid combination, e.g. fast >= slow
-            skipped += 1
-            log.debug("skipping %s: %s", params, exc)
-            continue
-        result = backtester.run(df, strategy, symbol=config.data.symbol, benchmark=False)
-        m = result.metrics
-        rows.append(
-            {
-                **dict(zip(keys, combo)),
-                "return_pct": round(m.total_return * 100, 2),
-                "cagr_pct": round(m.cagr * 100, 2),
-                "sharpe": round(m.sharpe, 3),
-                "max_dd_pct": round(m.max_drawdown * 100, 2),
-                "trades": m.num_trades,
-                "win_rate_pct": round(m.win_rate * 100, 1),
-            }
-        )
-
-    if not rows:
+    if not result.rows:
         print("No valid parameter combinations to test.")
         return 1
 
-    table = pd.DataFrame(rows).sort_values(args.sort, ascending=False).reset_index(drop=True)
-    tested = f"\nTested {len(rows)} combination(s)"
-    print(tested + (f", skipped {skipped} invalid" if skipped else ""))
-    print(f"Ranked by {args.sort} (top {min(args.top, len(table))}):\n")
+    table = result.table(include_ineligible=args.include_thin)
+    tested = f"\nTested {len(result.rows)} combination(s)"
+    if result.skipped:
+        tested += f", skipped {result.skipped} invalid"
+    thin = len(result.rows) - len(result.eligible)
+    if thin and not args.include_thin:
+        tested += f", hid {thin} with fewer than {args.min_trades} trades"
+    print(tested)
+    print(f"Ranked by {args.objective} (top {min(args.top, len(table))}):\n")
     print(table.head(args.top).to_string(index=False))
+
     print(
-        "\nNote: the top row is the best fit to this sample, which is not the same as "
-        "the best strategy. Re-test it on data the search never saw."
+        f"\nCaution: {len(result.rows)} combinations were scored against the same "
+        f"{len(df)} bars, so the top row is the best fit to this sample rather than "
+        "the best strategy. Confirm it with:\n"
+        f"  python -m algobot walkforward --strategy {config.strategy.name} "
+        + " ".join(f"--grid {k}={','.join(str(v) for v in vals)}" for k, vals in grid.items())
     )
 
     if args.out:
@@ -255,7 +260,100 @@ def cmd_optimize(args: argparse.Namespace) -> int:
 
         path = Path(args.out)
         path.parent.mkdir(parents=True, exist_ok=True)
-        table.to_csv(path, index=False)
+        result.table(include_ineligible=True).to_csv(path, index=False)
+        print(f"Wrote {path}")
+    return 0
+
+
+def cmd_walkforward(args: argparse.Namespace) -> int:
+    """Validate a strategy on data its parameter search never saw."""
+    config, base_params = _resolve(args)
+    df = _load_bars(config)
+    grid = _build_grid(args)
+
+    result = walk_forward(
+        df,
+        config.strategy.name,
+        grid,
+        base_params=base_params,
+        config=config.backtest,
+        risk=RiskManager(config.risk),
+        n_splits=args.splits,
+        train_size=args.train_size,
+        scheme=args.scheme,
+        objective=args.objective,
+        min_trades=args.min_trades,
+        symbol=config.data.symbol,
+    )
+
+    print(result.summary())
+    print("\nPer-fold results\n")
+    print(result.folds_table().to_string(index=False))
+    print("\nParameter stability across folds\n")
+    print(result.parameter_stability().to_string(index=False))
+    print(
+        "\nRead it this way: efficiency near 1.0 with parameters that barely move "
+        "means the edge survived contact with unseen data. Parameters that change "
+        "every fold mean the search is refitting, not validating."
+    )
+
+    if args.out:
+        from pathlib import Path
+
+        path = Path(args.out)
+        path.mkdir(parents=True, exist_ok=True)
+        result.equity.to_frame("equity").to_csv(path / "oos_equity.csv")
+        result.folds_table().to_csv(path / "folds.csv", index=False)
+        if len(result.trades):
+            result.trades.to_csv(path / "oos_trades.csv", index=False)
+        print(f"\nWrote {path}/oos_equity.csv, folds.csv, oos_trades.csv")
+    return 0
+
+
+def cmd_montecarlo(args: argparse.Namespace) -> int:
+    """Resample a backtest to see how much of it was the luck of the draw."""
+    config, params = _resolve(args)
+    df = _load_bars(config)
+    strategy = get_strategy(config.strategy.name, **params)
+
+    result = Backtester(config.backtest, RiskManager(config.risk)).run(
+        df, strategy, symbol=config.data.symbol
+    )
+    if not len(result.trades) and args.method == "trades":
+        print("The backtest produced no closed trades, so there is nothing to resample.")
+        return 1
+
+    simulation = monte_carlo(
+        result.equity,
+        result.trades,
+        method=args.method,
+        trials=args.trials,
+        block=args.block,
+        seed=args.seed,
+        ruin_threshold=args.ruin_threshold,
+    )
+
+    print(f"Strategy: {result.strategy} on {config.data.symbol}\n")
+    print(simulation.summary())
+    if simulation.observations < 30 and args.method == "trades":
+        print(
+            f"\nCaution: only {simulation.observations} trades were resampled. "
+            "The spread below roughly 30 observations reflects the small sample "
+            "as much as the strategy."
+        )
+
+    if args.out:
+        from pathlib import Path
+
+        path = Path(args.out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "total_return": simulation.total_returns,
+                "final_equity": simulation.final_equity,
+                "max_drawdown": simulation.max_drawdowns,
+            }
+        ).to_csv(path, index=False)
         print(f"Wrote {path}")
     return 0
 
@@ -264,13 +362,19 @@ def cmd_strategies(args: argparse.Namespace) -> int:
     from algobot.strategies import REGISTRY
 
     print("Available strategies:\n")
-    for name in available():
-        cls = REGISTRY[name]
-        doc = (cls.__doc__ or "").strip().splitlines()[0] if cls.__doc__ else ""
-        print(f"  {name:<12} {doc}")
-        for key, default in cls.params_schema.items():
-            print(f"      {key} = {default!r}")
-        print()
+    for family in ("trend", "mean-reversion", "benchmark"):
+        names = [n for n in available() if FAMILIES.get(n) == family]
+        if not names:
+            continue
+        print(f"  [{family}]")
+        for name in names:
+            cls = REGISTRY[name]
+            doc = (cls.__doc__ or "").strip().splitlines()[0] if cls.__doc__ else ""
+            print(f"    {name:<14} {doc}")
+            for key, default in cls.params_schema.items():
+                print(f"        {key} = {default!r}")
+            print()
+    print("Use with:  --strategy NAME --param key=value")
     return 0
 
 
@@ -296,20 +400,84 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bt.set_defaults(func=cmd_backtest)
 
+    def add_grid_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--grid",
+            action="append",
+            metavar="KEY=V1,V2",
+            help="parameter values to sweep; repeatable",
+        )
+        p.add_argument("--fast", help="shorthand for --grid fast=...")
+        p.add_argument("--slow", help="shorthand for --grid slow=...")
+        p.add_argument(
+            "--objective",
+            default="sharpe",
+            choices=sorted(OBJECTIVES),
+            help="metric to maximise (default: sharpe)",
+        )
+        p.add_argument(
+            "--min-trades",
+            type=int,
+            default=5,
+            help="ignore parameter sets with fewer round trips (default: 5)",
+        )
+
     opt = sub.add_parser("optimize", help="grid-search strategy parameters")
     _add_common(opt)
-    opt.add_argument(
-        "--grid",
-        action="append",
-        metavar="KEY=V1,V2",
-        help="parameter values to sweep; repeatable",
-    )
-    opt.add_argument("--fast", help="shorthand for --grid fast=...")
-    opt.add_argument("--slow", help="shorthand for --grid slow=...")
-    opt.add_argument("--sort", default="sharpe", help="ranking column (default: sharpe)")
+    add_grid_args(opt)
     opt.add_argument("--top", type=int, default=15, help="rows to display")
+    opt.add_argument(
+        "--include-thin",
+        action="store_true",
+        help="also rank parameter sets that traded fewer than --min-trades times",
+    )
     opt.add_argument("--out", help="write the full ranking to this CSV path")
     opt.set_defaults(func=cmd_optimize)
+
+    wf = sub.add_parser(
+        "walkforward",
+        help="validate on data the parameter search never saw",
+    )
+    _add_common(wf)
+    add_grid_args(wf)
+    wf.add_argument("--splits", type=int, default=5, help="number of folds (default: 5)")
+    wf.add_argument(
+        "--train-size",
+        type=float,
+        default=0.5,
+        help="fraction of the series used for the first training window (default: 0.5)",
+    )
+    wf.add_argument(
+        "--scheme",
+        choices=["anchored", "rolling"],
+        default="anchored",
+        help="anchored training windows grow, rolling windows slide",
+    )
+    wf.add_argument("--out", help="directory for oos_equity.csv, folds.csv, oos_trades.csv")
+    wf.set_defaults(func=cmd_walkforward)
+
+    mc = sub.add_parser(
+        "montecarlo",
+        help="resample a backtest to measure how much of it was luck",
+    )
+    _add_common(mc)
+    mc.add_argument(
+        "--method",
+        choices=["trades", "returns"],
+        default="trades",
+        help="resample trade outcomes or block-resample bar returns",
+    )
+    mc.add_argument("--trials", type=int, default=2_000, help="simulated paths (default: 2000)")
+    mc.add_argument("--block", type=int, default=10, help="block length for --method returns")
+    mc.add_argument("--seed", type=int, default=7, help="RNG seed, for reproducibility")
+    mc.add_argument(
+        "--ruin-threshold",
+        type=float,
+        default=0.5,
+        help="drawdown that counts as ruin (default: 0.5)",
+    )
+    mc.add_argument("--out", help="write every simulated path outcome to this CSV path")
+    mc.set_defaults(func=cmd_montecarlo)
 
     ls = sub.add_parser("strategies", help="list registered strategies and parameters")
     ls.set_defaults(func=cmd_strategies)
