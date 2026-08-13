@@ -97,6 +97,24 @@ def test_position_is_flat_on_the_final_bar():
     assert not result.trades.empty
 
 
+def test_open_position_is_liquidated_at_the_final_close():
+    bars = make_bars(prices=[100, 101, 102, 103, 104], opens=[100, 100, 101, 102, 103])
+    result = run_backtest(bars, ScriptedStrategy(sequence=[1]), FREE, NO_RISK_LIMITS)
+
+    final = result.trades.iloc[-1]
+    assert final["exit_reason"] == "end_of_data"
+    assert final["exit_price"] == pytest.approx(104.0)  # the close, not the open
+
+
+def test_no_position_is_opened_on_the_final_bar():
+    """Entering on the last bar could only book a cost, never a result."""
+    bars = make_bars(prices=[100.0] * 6)
+    result = run_backtest(bars, ScriptedStrategy(sequence=[0, 0, 0, 0, 1, 1]), FREE, NO_RISK_LIMITS)
+
+    assert result.trades.empty
+    assert (result.positions == 0).all()
+
+
 def test_long_only_strategy_never_goes_short():
     bars = make_bars(prices=np.linspace(100, 60, 60))
     result = run_backtest(bars, ScriptedStrategy(sequence=[1, 0, 1, 0]), FREE, NO_RISK_LIMITS)

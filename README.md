@@ -30,24 +30,36 @@ python -m algobot backtest --symbol AAPL --start 2018-01-01 --show-trades 10
 Output:
 
 ```
-======================================================================
+========================================================================
 ema_cross(fast=20, slow=50, allow_short=False, trend_filter=200) on DEMO
-======================================================================
+========================================================================
   Period              2020-01-01 to 2022-11-15  (2.87 years)
-  Equity              100,000.00 -> 94,335.10
-  Total return        -5.66%
-  CAGR                -2.01%
-  Sharpe              -0.83
-  Max drawdown        -6.77%  (698 bars underwater)
-  Time in market      35.47%
-  Trades              15
-  Win rate            13.33%
-  Profit factor       0.21
-  Costs paid          commission 254.59, slippage 101.84
-======================================================================
-Benchmark (buy & hold, no costs): return -22.41%, CAGR -8.46%, ...
-Edge vs benchmark: +16.75% total return
+  Equity              100,000.00 -> 95,455.64
+  Total return        -4.54%
+  CAGR                -1.61%
+  Volatility (ann.)   1.88%
+  Sharpe              -0.82
+  Sortino             -0.38
+  Max drawdown        -5.23%  (368 bars underwater)
+  Calmar              -0.31
+  Time in market      23.47%
+  Trades              13
+  Win rate            7.69%
+  Profit factor       0.08
+  Expectancy/trade    -349.57
+  Avg win / avg loss  411.62 / -413.00
+  Best / worst trade  411.62 / -985.00
+  Avg bars held       13.5
+  Costs paid          commission 224.51, slippage 89.80
+========================================================================
+Benchmark (buy & hold, no costs): return -22.41%, CAGR -8.46%, Sharpe -0.33, max DD -34.18%
+Edge vs benchmark: +17.87% total return
 ```
+
+Those are losing numbers, and that is the point: the sample file is random
+noise, and on noise a trend strategy pays costs for nothing. Losing less than
+buy-and-hold is what a stop-loss buys you, not alpha. Point it at real bars
+before drawing conclusions.
 
 ## Commands
 
@@ -108,6 +120,8 @@ A backtester is only as useful as the mistakes it refuses to make. This one:
   every result, because beating an index is the only return that counts.
 - **Warms up before trading.** No position is taken until every indicator and
   the ATR are fully formed.
+- **Closes its books.** The final bar opens nothing new and liquidates whatever
+  is open at the close, so no reported return rests on an unclosed position.
 
 What it does *not* model: partial fills, order-book depth, borrow costs and
 shorting fees, dividends beyond Yahoo's adjusted prices, intrabar path detail

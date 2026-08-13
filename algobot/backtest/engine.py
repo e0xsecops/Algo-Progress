@@ -10,7 +10,9 @@ open. Within a bar the sequence is:
     3. mark equity at the close and check the drawdown kill-switch
 
 Gaps are filled pessimistically: a stop that gaps through fills at the open,
-not at the stop price.
+not at the stop price. The final bar opens no new position and liquidates any
+open one at the close, so no result depends on a position the data cannot
+close.
 """
 
 from __future__ import annotations
@@ -154,32 +156,36 @@ class Backtester:
         for i in range(n):
             ts = index[i]
 
+            # No new position is opened on the final bar: there is no future
+            # left to hold it through, so entering would only book a cost.
+            last_bar = i == n - 1
+
             if halted_at is None:
                 if on_close:
-                    # Decide and execute at this bar's close, so the protective
-                    # exits belong to the position carried into the bar.
+                    # Exits are tested first here, because they belong to the
+                    # position carried into the bar rather than to this decision.
                     stop_price, take_profit = self._check_exits(
                         broker, ts, i, open_[i], high[i], low[i], stop_price, take_profit
                     )
-                    target = signal_values[i]
-                    ref_price, atr_ref = close[i], atr_values[i]
-                else:
-                    target = signal_values[i - 1] if i > 0 else 0.0
-                    ref_price, atr_ref = open_[i], atr_values[i - 1] if i > 0 else np.nan
 
-                if i == n - 1:
-                    target = 0.0  # never carry a position past the data
+                if not last_bar:
+                    if on_close:
+                        target = signal_values[i]
+                        ref_price, atr_ref = close[i], atr_values[i]
+                    else:
+                        target = signal_values[i - 1] if i > 0 else 0.0
+                        ref_price, atr_ref = open_[i], atr_values[i - 1] if i > 0 else np.nan
 
-                stop_price, take_profit = self._apply_target(
-                    broker, risk, ts, i, target, ref_price, atr_ref, stop_price, take_profit
-                )
+                    stop_price, take_profit = self._apply_target(
+                        broker, risk, ts, i, target, ref_price, atr_ref, stop_price, take_profit
+                    )
 
                 if not on_close:
                     stop_price, take_profit = self._check_exits(
                         broker, ts, i, open_[i], high[i], low[i], stop_price, take_profit
                     )
 
-            if i == n - 1 and broker.position != 0.0:
+            if last_bar and broker.position != 0.0:
                 broker.close(ts, close[i], "end_of_data", i)
                 stop_price = take_profit = None
 
